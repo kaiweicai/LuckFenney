@@ -13,7 +13,8 @@ contract LuckFenney is OwnableUpgradeable {
         uint256 id;
         Reward[] rewards;
         uint256 quantity;
-        uint256 deadline;
+        uint256 duration;
+        uint startTime;
         LOTTERY_STATE state;
     }
 
@@ -52,11 +53,16 @@ contract LuckFenney is OwnableUpgradeable {
         require(luck.rewards.length > 0, "RLBTZ");
         require(
             luck.quantity > QuantityMin && luck.quantity <= QuantityMax,
-            "RLBTZ"
+            "LQBTMBLM"
         );
-        require(luck.deadline > block.number, "RLBTZ");
-        //收钱，并且确认收钱的数量。注意weth9的收取。
-        currentId = currentId +1;
+        luck.startTime = block.number;
+        // require(luck.deadline > block.number, "RLBTZ");
+        // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
+        // TODO 收取eth
+        for (uint256 i = 0; i < luck.rewards.length; i++) {
+            Reward memory reward = luck.rewards[i];
+        }
+        currentId += 1;
         luck.id = currentId;
         addRunningLucks(luck);
         producerLucks[msg.sender] = currentId;
