@@ -12,10 +12,11 @@ contract LuckFenney is OwnableUpgradeable {
         address producer; // the project
         uint256 id;
         Reward[] rewards;
-        uint256 quantity;
-        uint256 duration;
+        uint256 quantity; //参与人数
+        uint256 duration; //持续时间
         uint startTime;
         LOTTERY_STATE state;
+        ethAmount// 奖品eth的数量
     }
 
     struct Reward {
@@ -55,10 +56,13 @@ contract LuckFenney is OwnableUpgradeable {
             luck.quantity > QuantityMin && luck.quantity <= QuantityMax,
             "LQBTMBLM"
         );
+        uint256 ethAmount = msg.value;
+        require(ethAmount == luck.ethAmount, "ethAmount engough");
         luck.startTime = block.number;
         // require(luck.deadline > block.number, "RLBTZ");
         // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
         // TODO 收取eth
+
         for (uint256 i = 0; i < luck.rewards.length; i++) {
             Reward memory reward = luck.rewards[i];
         }
