@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../interfaces/IERC20.sol";
 
 contract LuckFenney is OwnableUpgradeable {
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
-    uint256 public currentId=0;
+    uint256 public currentId = 0;
     mapping(address=>uint) public producerLucks;
     mapping(uint=>Lucky) public runningLucks;
     struct Lucky {
@@ -16,7 +17,7 @@ contract LuckFenney is OwnableUpgradeable {
         uint256 duration; //持续时间
         uint startTime;
         LOTTERY_STATE state;
-        ethAmount// 奖品eth的数量
+        uint ethAmount;// 奖品eth的数量
     }
 
     struct Reward {
@@ -65,6 +66,11 @@ contract LuckFenney is OwnableUpgradeable {
 
         for (uint256 i = 0; i < luck.rewards.length; i++) {
             Reward memory reward = luck.rewards[i];
+            if(reward.rewardType == RewardType.ERC20){
+                IERC20(reward.token).transferFrom(msg.sender,address(this),reward.amount);
+            }else if(reward.rewardType == RewardType.ERC721){
+                IERC721(reward.token).transferFrom(msg.sender,address(this),reward.amount);
+            }
         }
         currentId += 1;
         luck.id = currentId;
