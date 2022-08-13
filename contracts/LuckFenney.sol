@@ -2,22 +2,25 @@
 pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../interfaces/IERC20.sol";
+import "../interfaces/IERC721.sol";
+import "../interfaces/ERC721TokenReceiver.sol";
 
-contract LuckFenney is OwnableUpgradeable {
+contract LuckFenney is ERC721TokenReceiver, OwnableUpgradeable {
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
-    mapping(address=>uint) public producerLucks;
-    mapping(uint=>Lucky) public runningLucks;
+    mapping(address => uint256) public producerLucks;
+    mapping(uint256 => Lucky) public runningLucks;
     struct Lucky {
         address producer; // the project
         uint256 id;
         Reward[] rewards;
         uint256 quantity; //参与人数
         uint256 duration; //持续时间
-        uint startTime;
+        uint256 startTime;
         LOTTERY_STATE state;
-        uint ethAmount;// 奖品eth的数量
+        uint256 ethAmount; // 奖品eth的数量
+        uint[] erc721TokenIds;
     }
 
     struct Reward {
@@ -66,10 +69,18 @@ contract LuckFenney is OwnableUpgradeable {
 
         for (uint256 i = 0; i < luck.rewards.length; i++) {
             Reward memory reward = luck.rewards[i];
-            if(reward.rewardType == RewardType.ERC20){
-                IERC20(reward.token).transferFrom(msg.sender,address(this),reward.amount);
-            }else if(reward.rewardType == RewardType.ERC721){
-                IERC721(reward.token).transferFrom(msg.sender,address(this),reward.amount);
+            if (reward.rewardType == RewardType.ERC20) {
+                IERC20(reward.token).transferFrom(
+                    msg.sender,
+                    address(this),
+                    reward.amount
+                );
+            } else if (reward.rewardType == RewardType.ERC721) {
+                IERC721(reward.token).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    reward.amount
+                );
             }
         }
         currentId += 1;
@@ -78,10 +89,20 @@ contract LuckFenney is OwnableUpgradeable {
         producerLucks[msg.sender] = currentId;
     }
 
-    function addRunningLucks(Lucky memory luck)internal {
+    function addRunningLucks(Lucky memory luck) internal {
         luck.state = LOTTERY_STATE.OPEN;
         runningLucks[luck.id] = luck;
     }
 
-
+    function onERC721Received(
+        address _operator,
+        address _from,
+        uint256 _tokenId,
+        bytes memory _data
+    ) external returns (bytes4) {
+        // store teh erc721 token
+        // check the transfer 721 token is 
+        //story the tokenId.
+        
+    }
 }
