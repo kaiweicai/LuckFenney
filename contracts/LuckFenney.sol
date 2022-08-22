@@ -17,13 +17,14 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         address producer; // the project
         uint256 id;
         Reward[] rewards;
-        uint256 quantity; //参与人数
-        uint256 duration; //持续时间
+        uint256 quantity; //计划该luck参与人数
+        uint256 endTime; //持续时间
         uint256 startTime;
-        LOTTERY_STATE state;
+        LuckyState state;
         uint256 ethAmount; // 奖品eth的数量
         uint256[] erc721TokenIds;
         uint256 participation_cost;// 参与的花费。
+        uint256 currentQutity;//当前用户的编号
     }
 
     struct Reward {
@@ -39,7 +40,7 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         ERC1155
     }
 
-    enum LOTTERY_STATE {
+    enum LuckyState {
         OPEN,
         CLOSED,
         CALCULATING_WINNER
@@ -58,15 +59,22 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         __Ownable_init();
     }
 
-    function createLuck(Lucky memory luck) public payable {
-        require(luck.rewards.length > 0, "RLBTZ");
+    function createLuck(uint quantity,Reward[] memory rewards,uint duration) public payable returns(Lucky memory luck){
+        require(rewards.length > 0, "RLBTZ");
         require(
-            luck.quantity > QuantityMin && luck.quantity <= QuantityMax,
+            quantity > QuantityMin && quantity <= QuantityMax,
             "LQBTMBLM"
         );
+        require(duration > 0,"duration lt 0");
+        luck.endTime = luck.startTime +duration;
+        luck.rewards = rewards;
+        luck.quantity = quantity;
+        // 设置创建人
+        luck.producer = msg.sender;
         uint256 ethAmount = msg.value;
         require(ethAmount == luck.ethAmount, "ethAmount engough");
         luck.startTime = block.number;
+        
         // require(luck.deadline > block.number, "RLBTZ");
         // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
         // TODO 收取eth
@@ -106,8 +114,19 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
     }
 
     function addRunningLucks(Lucky memory luck) internal {
-        luck.state = LOTTERY_STATE.OPEN;
+        luck.state = LuckyState.OPEN;
         runningLucks[luck.id] = luck;
+    }
+
+
+    // 用户参与luck
+    function enter(uint luckId) public payable{
+        Lucky memory luckFenney = runningLucks[luckId];
+        require(luckFenney.state == LuckyState.OPEN,"not open");
+        uint value = msg.value;
+        require(value > 0 && value%luckFenney.participation_cost==0,"value mul pari");
+        // 分配用户号给用户。
+
     }
 
     function onERC721Received(
@@ -115,11 +134,11 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         address _from,
         uint256 _tokenId,
         bytes memory _data
-    ) external override returns (bytes4) {
+    ) public override returns (bytes4) {
         // store teh erc721 token
         // check the transfer 721 token is
         //story the tokenId.
-        return this.onERC721Received.selector;
+        return super.onERC721Received(_operator,_from,_tokenId,_data);
     }
 
     function onERC1155Received(
@@ -127,9 +146,9 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         address _from,
         uint256 _id,
         uint256 _value,
-        bytes calldata _data
+        bytes memory _data
     ) public override returns (bytes4) {
-        return this.onERC1155Received.selector;
+        return super.onERC1155Received(_operator,_from,_id,_value,_data);
     }
 
 }
