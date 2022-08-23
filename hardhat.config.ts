@@ -26,7 +26,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 9999,
+        runs: 200,
       },
       metadata: {
         bytecodeHash: "none",
@@ -34,8 +34,8 @@ const config: HardhatUserConfig = {
     },
   },
   gasReporter: {
-    // enabled: process.env.REPORT_GAS !== undefined,
-    enabled: true,
+    enabled: process.env.REPORT_GAS !== undefined,
+    // enabled: true,
     // gasPrice: 21,
     currency: "USD",
   },

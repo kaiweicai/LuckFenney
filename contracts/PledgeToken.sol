@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract PledgeToken is ERC20, OwnableUpgradeable{
+
+contract PledgeToken is ERC20Upgradeable, OwnableUpgradeable{
     IERC20 public platformToken; //平台币
     
 
@@ -16,7 +18,7 @@ contract PledgeToken is ERC20, OwnableUpgradeable{
     // 特征：已经发行过至少1个质押代币；
     // 规则：转入1个平台币，需要存入的ETH数量 = 合约的ETH余额 / 总发行质押代币数量；
     // 用户可以调用 withdraw 接口，提取ETH，每1个质押代币可以提取ETH数量 = 合约的ETH余额 / 总发行质押代币数量。提取后，相应的质押代币销毁。
-    constructor(string memory name_, string memory symbol_)
-        ERC20(name_, symbol_)
-    {}
+    constructor(string memory name_, string memory symbol_){
+        __ERC20_init(name_,symbol_);
+    }
 }

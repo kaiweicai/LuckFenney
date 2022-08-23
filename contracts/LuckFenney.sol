@@ -6,17 +6,22 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./libraries/TransferHelper.sol";
+import "hardhat/console.sol";
 
 contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
+    using EnumerableSet for EnumerableSet.UintSet;
     using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
-    mapping(address => uint256) public producerLucks;
+    mapping(address => uint[]) public producerLucks;
     mapping(uint256 => Lucky) public runningLucks;
     mapping(uint256 => Reward[]) public luckyRewards;
     mapping(uint256 => mapping(uint256=>address)) public userAttends; // 用户参与的
+
+
     struct Lucky {
         address producer; // the project
         uint256 id;
@@ -63,10 +68,12 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         __Ownable_init();
     }
 
+    /// parameters 
+    /// quantity - max quantity of attend users
     function createLuck(uint quantity,Reward[] memory rewards,uint duration) public payable returns(Lucky memory luck){
-        require(rewards.length > 0, "RLBTZ");
+        // require(rewards.length > 0, "RLBTZ");
         require(
-            quantity > QuantityMin && quantity <= QuantityMax,
+            quantity >= QuantityMin && quantity <= QuantityMax,
             "LQBTMBLM"
         );
         require(duration > 0,"duration lt 0");
@@ -77,7 +84,7 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         uint256 ethAmount = msg.value;
         require(ethAmount == luck.ethAmount, "ethAmount engough");
         luck.startTime = block.number;
-        currentId += 1;
+        
         // require(luck.deadline > block.number, "RLBTZ");
         // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
         // TODO 收取eth
@@ -114,11 +121,14 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         luck.id = currentId;
         //添加正在运行抽奖，并且修改状态。
         addRunningLucks(luck);
-        producerLucks[msg.sender] = currentId;
+        console.log("currentId1 is:",currentId);
+        producerLucks[msg.sender].push(currentId);
+        currentId += 1;
     }
 
     function addRunningLucks(Lucky memory luck) internal {
         luck.state = LuckyState.OPEN;
+        console.log("luck.id is:",luck.id);
         runningLucks[luck.id] = luck;
     }
 
@@ -160,5 +170,10 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
     ) public override returns (bytes4) {
         return super.onERC1155Received(_operator,_from,_id,_value,_data);
     }
+
+    function getProducerLucks(address operater)public view returns (uint[] memory results){
+        return producerLucks[operater];
+    }
+
 
 }
