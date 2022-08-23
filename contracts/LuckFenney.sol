@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "../interfaces/IERC20.sol";
+import "./interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "./libraries/TransferHelper.sol";
 
 contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
+    using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
     mapping(address => uint256) public producerLucks;
     mapping(uint256 => Lucky) public runningLucks;
+    mapping(uint256 => Reward[]) public luckyRewards;
+    mapping(uint256 => mapping(uint256=>address)) public userAttends; // 用户参与的
     struct Lucky {
         address producer; // the project
         uint256 id;
-        Reward[] rewards;
+        // Reward[] rewards;
         uint256 quantity; //计划该luck参与人数
         uint256 endTime; //持续时间
         uint256 startTime;
@@ -67,19 +71,19 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         );
         require(duration > 0,"duration lt 0");
         luck.endTime = luck.startTime +duration;
-        luck.rewards = rewards;
         luck.quantity = quantity;
         // 设置创建人
         luck.producer = msg.sender;
         uint256 ethAmount = msg.value;
         require(ethAmount == luck.ethAmount, "ethAmount engough");
         luck.startTime = block.number;
-        
+        currentId += 1;
         // require(luck.deadline > block.number, "RLBTZ");
         // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
         // TODO 收取eth
-        for (uint256 i = 0; i < luck.rewards.length; i++) {
-            Reward memory reward = luck.rewards[i];
+        for (uint256 i = 0; i < rewards.length; i++) {
+            luckyRewards[currentId][i] = rewards[i];
+            Reward memory reward = rewards[i];
             if (reward.rewardType == RewardType.ERC20) {
 
                 IERC20(reward.token).transferFrom(
@@ -106,7 +110,7 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
                 );
             }
         }
-        currentId += 1;
+        
         luck.id = currentId;
         //添加正在运行抽奖，并且修改状态。
         addRunningLucks(luck);
@@ -124,9 +128,15 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         Lucky memory luckFenney = runningLucks[luckId];
         require(luckFenney.state == LuckyState.OPEN,"not open");
         uint value = msg.value;
-        require(value > 0 && value%luckFenney.participation_cost==0,"value mul pari");
+        require(value > 0 && value/luckFenney.participation_cost>0,"value mul pari");
         // 分配用户号给用户。
-
+        uint256 attendAmount = value / luckFenney.participation_cost;
+        require(luckFenney.currentQutity+attendAmount <= luckFenney.quantity,"too attends");
+        for (uint256 i = 0; i < attendAmount; i++){
+            userAttends[luckId][luckFenney.currentQutity++] = msg.sender;
+        }
+        //退还用户的多余的资金。
+        address(this).safeTransfer(msg.sender,value%luckFenney.participation_cost);
     }
 
     function onERC721Received(
