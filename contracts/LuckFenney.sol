@@ -173,8 +173,12 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         return super.onERC1155Received(_operator,_from,_id,_value,_data);
     }
 
-    function getProducerLucks(address operater)public view returns (uint[] memory results){
+    function getProducerLucks(address operater)public view returns (uint[] memory){
         return producerLucks[operater];
+    }
+
+    function getLuckyRewards(uint currenctId)public view returns (Reward[] memory rewards){
+        return luckyRewards[currenctId];
     }
 
 
