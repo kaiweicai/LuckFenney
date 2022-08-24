@@ -17,8 +17,9 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
     mapping(address => uint[]) public producerLucks;
-    mapping(uint256 => Lucky) public runningLucks;
+    mapping(uint256 => Lucky) public lucksMap;
     mapping(uint256 => Reward[]) public luckyRewards;
+    uint256[] public runningLucks;
     mapping(uint256 => mapping(uint256=>address)) public userAttends; // 用户参与的
 
 
@@ -89,7 +90,7 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         // TODO 收钱，并且确认收钱的数量。注意weth9的收取。
         // TODO 收取eth
         for (uint256 i = 0; i < rewards.length; i++) {
-            luckyRewards[currentId][i] = rewards[i];
+            luckyRewards[currentId].push(rewards[i]);
             Reward memory reward = rewards[i];
             if (reward.rewardType == RewardType.ERC20) {
 
@@ -123,19 +124,20 @@ contract LuckFenney is ERC721Holder,ERC1155Holder, OwnableUpgradeable{
         addRunningLucks(luck);
         console.log("currentId1 is:",currentId);
         producerLucks[msg.sender].push(currentId);
+        lucksMap[luck.id] = luck;
         currentId += 1;
     }
 
     function addRunningLucks(Lucky memory luck) internal {
         luck.state = LuckyState.OPEN;
         console.log("luck.id is:",luck.id);
-        runningLucks[luck.id] = luck;
+        runningLucks.push(luck.id);
     }
 
 
     // 用户参与luck
     function enter(uint luckId) public payable{
-        Lucky memory luckFenney = runningLucks[luckId];
+        Lucky memory luckFenney = lucksMap[luckId];
         require(luckFenney.state == LuckyState.OPEN,"not open");
         uint value = msg.value;
         require(value > 0 && value/luckFenney.participation_cost>0,"value mul pari");
