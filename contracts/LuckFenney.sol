@@ -6,12 +6,10 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./libraries/TransferHelper.sol";
 import "hardhat/console.sol";
 
 contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
-    using EnumerableSet for EnumerableSet.UintSet;
     using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
@@ -20,7 +18,17 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
     mapping(uint256 => Lucky) public lucksMap;
     mapping(uint256 => Reward[]) public luckyRewards;
     uint256[] public runningLucks;
+    IERC20 public paltformToken;
+    uint public attendRewardAmount; // 用户参与奖励平台token的数量。
+    uint public holderRewardAmount; // 用户参与奖励平台token的数量。
     mapping(uint256 => mapping(uint256 => address)) public userAttends; // 用户参与的
+    mapping(address => bool) public isManager;
+    event SetManager(address manager, bool flag);
+
+    modifier onlyManager() {
+        require(isManager[_msgSender()], "Not manager");
+        _;
+    }
 
     struct Lucky {
         address producer; // the project
@@ -32,7 +40,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
         uint256 ethAmount; // 奖品eth的数量
         uint256[] erc721TokenIds;
         uint256 participation_cost; // 参与的花费。
-        uint256 currentQutity; //已经参加的用户的个数。
+        uint256 currentQuantity; //已经参加的用户的个数。
     }
 
     struct Reward {
@@ -57,15 +65,13 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
 
     event LuckCreated(uint256 LuckID, address creator);
 
-    mapping(address => bool) private isManager;
 
-    modifier onlyManager() {
-        require(isManager[_msgSender()], "Not manager");
-        _;
-    }
-
-    function initialize() public initializer {
+    function initialize(IERC20 paltformToken_,uint userReward_,uint holderReward_) public initializer {
         __Ownable_init();
+        paltformToken = paltformToken_;
+        isManager[_msgSender()] = true;
+        attendRewardAmount = userReward_;
+        holderRewardAmount = holderReward_;
     }
 
     /// parameters
@@ -136,7 +142,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
 
     // 用户参与luck
     function enter(uint256 luckId) public payable {
-        Lucky memory luckFenney = lucksMap[luckId];
+        Lucky storage luckFenney = lucksMap[luckId];
         require(luckFenney.state == LuckyState.OPEN, "not open");
         console.log(
             "luckFenney.endBlock,block.number",
@@ -154,16 +160,21 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
         uint256 attendAmount = value / luckFenney.participation_cost;
         // 检查是否用户已经满员了。
         require(
-            luckFenney.currentQutity + attendAmount <= luckFenney.quantity,
+            luckFenney.currentQuantity + attendAmount <= luckFenney.quantity,
             "too attends"
         );
         console.log("-------------2");
         for (uint256 i = 0; i < attendAmount; i++) {
-            userAttends[luckId][luckFenney.currentQutity++] = msg.sender;
+            luckFenney.currentQuantity +=1;
+            userAttends[luckId][luckFenney.currentQuantity] = msg.sender;
         }
         console.log("-------------3");
         // 奖励用户平台token
-        //退还用户的多余的资金。
+        paltformToken.mint(msg.sender,attendAmount*attendRewardAmount);
+        //发起者发放代币
+        paltformToken.mint(luckFenney.producer,attendAmount*holderRewardAmount);
+        
+        // 退还用户的多余的资金。
         uint256 leftEth = value % luckFenney.participation_cost;
         console.log("lefEth is: ", leftEth);
         TransferHelper.safeTransferETH(
@@ -171,6 +182,14 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
             leftEth
         );
     }
+
+    //Random number generation from block timestamp
+    function getRandomNumber() public returns (uint){
+        uint blockNumber = block.number;
+        keccak256(blockNumber);
+    }
+    
+
 
     function onERC721Received(
         address _operator,

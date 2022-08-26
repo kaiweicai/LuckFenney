@@ -57,4 +57,5 @@ module.exports = {
   getBigNumber,
   time: require("./time"),
   ADDRESS_ZERO,
+  expandTo18Decimals: require("./utilities"),
 }

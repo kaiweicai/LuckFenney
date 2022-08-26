@@ -5,7 +5,14 @@ import { Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-const { ADDRESS_ZERO, expandTo18Decimals,time } = require("./shared");
+import { ERC20 } from "../types";
+const { ADDRESS_ZERO,time } = require("./shared");
+import {
+    expandTo18Decimals,
+    getApprovalDigest,
+    MINIMUM_LIQUIDITY,
+    setNextBlockTime,
+  } from "./shared/utilities";
 
 
 
@@ -18,9 +25,13 @@ describe("luckFenney test", async function () {
     async function v2Fixture([owner, user, alice, bob]: Wallet[], provider: MockProvider) {
         let LuckFenneyFactory = await ethers.getContractFactory("LuckFenney");
         let luckFenney = await LuckFenneyFactory.deploy();
-        await luckFenney.initialize();
+        let ERC20Factory = await ethers.getContractFactory("MyERC20");
+        let platformToken = await ERC20Factory.deploy();
+        await platformToken.initialize("platformToken","platformToken");
+        platformToken.transferOwnership(luckFenney.address);
+        await luckFenney.initialize(platformToken.address,expandTo18Decimals(5),expandTo18Decimals(1));
         return {
-            owner, user, alice, bob, luckFenney
+            owner, user, alice, bob, luckFenney,platformToken
         }
     }
 
@@ -50,7 +61,9 @@ describe("luckFenney test", async function () {
     it("create Fenney with erc20 rewards", async function () {
         let { owner,luckFenney } = await loadFixture(v2Fixture);
         let MyToken = await ethers.getContractFactory("MyERC20");
-        let myRewardToken = await MyToken.deploy("myToken","myToken");
+        let myRewardToken = await MyToken.deploy();
+        await myRewardToken.initialize("myrewardToken","myRewardToken");
+        await myRewardToken.mint(owner.address,expandTo18Decimals(1000));
         let token20Amount = 1000;
         await myRewardToken.approve(luckFenney.address,token20Amount)
         let participation = 400;
@@ -134,8 +147,10 @@ describe("luckFenney test", async function () {
 
         //add erc20 reward
         let MyToken = await ethers.getContractFactory("MyERC20");
-        let myErc20Token = await MyToken.deploy("myToken","myToken");
+        let myErc20Token = await MyToken.deploy();
         let token20Amount = 1000;
+        await myErc20Token.initialize("myToken","myToken");
+        await myErc20Token.mint(owner.address,expandTo18Decimals(1000));
         await myErc20Token.approve(luckFenney.address,token20Amount);
         let token20Reward = {token:myErc20Token.address,rewardType:0,amount:token20Amount,tokenId:0};
         let currentBlock = await time.latestBlock();
@@ -175,7 +190,7 @@ describe("luckFenney test", async function () {
 
     describe("luckFenney test enter", async function () {
         it("create Fenney with ERC20,ERC721,ERC1155 rewards for enter", async function () {
-            let { owner,luckFenney,user,alice } = await loadFixture(v2Fixture);
+            let { owner,luckFenney,user,alice,platformToken } = await loadFixture(v2Fixture);
             let MrErc1155Factory = await ethers.getContractFactory("MyErc1155Token");
             let my1155Token = await MrErc1155Factory.deploy();
             let erc1155TokenId = 0;
@@ -193,14 +208,17 @@ describe("luckFenney test", async function () {
     
             //add erc20 reward
             let MyToken = await ethers.getContractFactory("MyERC20");
-            let myErc20Token = await MyToken.deploy("myToken","myToken");
+            let myErc20Token = await MyToken.deploy();
+            await myErc20Token.initialize("myToken","myToken");
+            await myErc20Token.mint(owner.address,expandTo18Decimals(1000));
             let token20Amount = 1000;
             await myErc20Token.approve(luckFenney.address,token20Amount);
             let token20Reward = {token:myErc20Token.address,rewardType:0,amount:token20Amount,tokenId:0};
             let currentBlock = await time.latestBlock();
             let duration = 100;
             let participation = 400;
-            await luckFenney.createLuck(100,[token20Reward,token1155Reward,token721Reward],duration,participation);
+            let initializeQuantity = 100;
+            await luckFenney.createLuck(initializeQuantity,[token20Reward,token1155Reward,token721Reward],duration,participation);
             let luckyIds = await luckFenney.getProducerLucks(owner.address);
             expect(luckyIds[0]).to.be.equals(0);
             let currentId = await (await luckFenney.currentId()).sub(1);
@@ -225,16 +243,32 @@ describe("luckFenney test", async function () {
             await expect(luckFenney.connect(user).enter(1,{from:user.address})).to.be.revertedWith("not open");
             await expect(luckFenney.connect(user).enter(0,{from:user.address})).to.be.revertedWith("value error");
             await expect(luckFenney.connect(user).enter(0,{from:user.address,value:10})).to.be.revertedWith("value error");
-            let attendAmount = 500;
+            let attendAmount = 3000;
             await luckFenney.connect(user).enter(0,{from:user.address,value:attendAmount});
+            let luckyAfterEnter = await luckFenney.lucksMap(currentId);
             let balanceOfLucky = await ethers.provider.getBalance(luckFenney.address);
             console.log("balanceOfLucky is:",balanceOfLucky);
             expect(balanceOfLucky).to.be.equals(attendAmount - attendAmount%participation);
-            
-            
+            console.log("lucky.currentQuantity is:",luckyAfterEnter.currentQuantity);
+            let attend = BigNumber.from(attendAmount).div(participation);
+            expect(luckyAfterEnter.currentQuantity).to.be.equals(attend);
+            let quantity = luckyAfterEnter.quantity;
+            expect(quantity).to.be.equals(initializeQuantity);
+            let attendUserAddress = await luckFenney.userAttends(currentId ,luckyAfterEnter.currentQuantity);
+            expect(attendUserAddress).to.be.equals(user.address);
+
+            //再给用户购买100个超出总彩票异常
+            await expect(luckFenney.connect(user).enter(0,{from:user.address,value:attendAmount*100})).to.be.revertedWith("too attends");
 
             await time.advanceBlockTo(200);
             await expect(luckFenney.connect(user).enter(0,{from:user.address,value:10})).to.be.revertedWith("over endBlock");
+            let userBalanceOfPlatform = await platformToken.balanceOf(user.address);
+            let ownerBalanceOfPlatform = await platformToken.balanceOf(owner.address);
+            
+            let userRewardAmount = attend.mul(expandTo18Decimals(5));
+            let ownerRewardAmount = attend.mul(expandTo18Decimals(1));
+            expect(userRewardAmount).to.be.equals(userBalanceOfPlatform);
+            expect(ownerRewardAmount).to.be.equals(ownerBalanceOfPlatform);
         });
 
     });
