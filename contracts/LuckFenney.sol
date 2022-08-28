@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "./libraries/TransferHelper.sol";
+import "./libraries/RandomNumber.sol";
 import "hardhat/console.sol";
 
 contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
@@ -184,9 +185,9 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
     }
 
     //Random number generation from block timestamp
-    function getRandomNumber() public returns (uint){
-        uint blockNumber = block.number;
-        keccak256(blockNumber);
+    function getRandomNumber() public view returns (uint){
+        uint blockTime = block.timestamp;
+        return uint(keccak256(abi.encodePacked(blockTime)));
     }
     
 
