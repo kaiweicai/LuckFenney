@@ -251,6 +251,7 @@ describe("luckFenney test", async function () {
             expect(balanceOfLucky).to.be.equals(attendAmount - attendAmount%participation);
             console.log("lucky.currentQuantity is:",luckyAfterEnter.currentQuantity);
             let attend = BigNumber.from(attendAmount).div(participation);
+            console.log("attend is:",attend);
             expect(luckyAfterEnter.currentQuantity).to.be.equals(attend);
             let quantity = luckyAfterEnter.quantity;
             expect(quantity).to.be.equals(initializeQuantity);

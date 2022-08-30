@@ -22,7 +22,8 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
     IERC20 public paltformToken;
     uint public attendRewardAmount; // 用户参与奖励平台token的数量。
     uint public holderRewardAmount; // 用户参与奖励平台token的数量。
-    mapping(uint256 => mapping(uint256 => address)) public userAttends; // 用户参与的
+    mapping(uint256 => mapping(uint256 => address)) public luckAttenduser; // 用户参与的 luckId=>attendId=>address
+    mapping(address => mapping(uint256 => uint256)) public userAttendsLuck; // 用户参与的 address=>luckId=>attendId
     mapping(address => bool) public isManager;
     event SetManager(address manager, bool flag);
 
@@ -167,7 +168,9 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
         console.log("-------------2");
         for (uint256 i = 0; i < attendAmount; i++) {
             luckFenney.currentQuantity +=1;
-            userAttends[luckId][luckFenney.currentQuantity] = msg.sender;
+            address useAddress = msg.sender;
+            luckAttenduser[luckId][luckFenney.currentQuantity] = msg.sender;
+            userAttendsLuck[useAddress][luckId] = luckFenney.currentQuantity;
         }
         console.log("-------------3");
         // 奖励用户平台token
@@ -190,7 +193,10 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
         return uint(keccak256(abi.encodePacked(blockTime)));
     }
     
-
+    // pick_winner
+    function pickWinner() public returns(uint winnnerId,address winnerAddress){
+        
+    }
 
     function onERC721Received(
         address _operator,
