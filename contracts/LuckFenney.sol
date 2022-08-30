@@ -188,14 +188,19 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
     }
 
     //Random number generation from block timestamp
-    function getRandomNumber() public view returns (uint){
+    function getRandomNumber(uint256 luckId) public view returns (uint){
         uint blockTime = block.timestamp;
         return uint(keccak256(abi.encodePacked(blockTime)));
     }
     
     // pick_winner
-    function pickWinner() public returns(uint winnnerId,address winnerAddress){
-        
+    function pickWinner(uint256 luckId) public returns(uint winnnerId,address winnerAddress){
+        //not check the msg sender is holder ,let any one can end the this game.
+        Lucky storage luckFenney = lucksMap[luckId];
+        require(luckFenney.state == LuckyState.OPEN, "close but not open");
+        luckFenney.state = LuckyState.CLOSED;
+        require(luckFenney.endBlock <= block.number,"not end");
+        // start pickwinner;
     }
 
     function onERC721Received(
