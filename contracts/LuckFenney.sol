@@ -10,7 +10,7 @@ import "./libraries/TransferHelper.sol";
 import "./libraries/RandomNumber.sol";
 import "hardhat/console.sol";
 
-contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
+contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNumber {
     using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
@@ -187,20 +187,27 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable {
         );
     }
 
-    //Random number generation from block timestamp
-    function getRandomNumber(uint256 luckId) public view returns (uint){
-        uint blockTime = block.timestamp;
-        return uint(keccak256(abi.encodePacked(blockTime)));
-    }
+    // //Random number generation from block timestamp
+    // function getRandomNumber(uint256 luckId) public view returns (uint){
+    //     uint blockTime = block.timestamp;
+    //     return uint(keccak256(abi.encodePacked(blockTime)));
+    // }
     
     // pick_winner
-    function pickWinner(uint256 luckId) public returns(uint winnnerId,address winnerAddress){
+    function pickWinner(uint256 luckId) public returns(uint winnerId,address winnerAddress){
         //not check the msg sender is holder ,let any one can end the this game.
         Lucky storage luckFenney = lucksMap[luckId];
         require(luckFenney.state == LuckyState.OPEN, "close but not open");
         luckFenney.state = LuckyState.CLOSED;
         require(luckFenney.endBlock <= block.number,"not end");
+        //check currentQuantity >0
+        uint attendQuantity = luckFenney.currentQuantity;
+        require(attendQuantity > 0, "not attend amount");
         // start pickwinner;
+        uint randomNumber = randomNumber(luckId);
+        winnerId = (randomNumber % attendQuantity)+1;
+        winnerAddress = luckAttenduser[luckId][winnerId];
+       
     }
 
     function onERC721Received(
