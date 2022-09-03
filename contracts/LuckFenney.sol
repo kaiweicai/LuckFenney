@@ -10,11 +10,17 @@ import "./libraries/TransferHelper.sol";
 import "./libraries/RandomNumber.sol";
 import "hardhat/console.sol";
 
+
 contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNumber {
-    using TransferHelper for address;
+    // using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
+    uint public feeRatio;
+    uint public feePledgeRatio;
+    uint public constant base = 10000;
+    address public pledgeAddress;
+    address public platformAddress;
     mapping(address => uint256[]) public producerLucks;
     mapping(uint256 => Lucky) public lucksMap;
     mapping(uint256 => Reward[]) public luckyRewards;
@@ -26,6 +32,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
     mapping(address => mapping(uint256 => uint256)) public userAttendsLuck; // 用户参与的 address=>luckId=>attendId
     mapping(address => bool) public isManager;
     event SetManager(address manager, bool flag);
+
 
     modifier onlyManager() {
         require(isManager[_msgSender()], "Not manager");
@@ -43,6 +50,8 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         uint256[] erc721TokenIds;
         uint256 participation_cost; // 参与的花费。
         uint256 currentQuantity; //已经参加的用户的个数。
+        uint256 winnerId;
+        address winnerAddress;
     }
 
     struct Reward {
@@ -68,12 +77,16 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
     event LuckCreated(uint256 LuckID, address creator);
 
 
-    function initialize(IERC20 paltformToken_,uint userReward_,uint holderReward_) public initializer {
+    function initialize(IERC20 paltformToken_,uint userReward_,uint holderReward_,address pledgeAddress_,address platformAddress_) public initializer {
         __Ownable_init();
         paltformToken = paltformToken_;
         isManager[_msgSender()] = true;
         attendRewardAmount = userReward_;
         holderRewardAmount = holderReward_;
+        feeRatio = 500;
+        feePledgeRatio = 8000;
+        pledgeAddress = pledgeAddress_;
+        platformAddress = platformAddress_;
     }
 
     /// parameters
@@ -84,6 +97,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         uint256 duration,
         uint256 participationCost_
     ) public payable returns (Lucky memory luck) {
+        currentId += 1;
         // require(rewards.length > 0, "RLBTZ");
         require(quantity >= QuantityMin && quantity <= QuantityMax, "LQBTMBLM");
         require(duration > 0, "duration lt 0");
@@ -91,7 +105,9 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         // 设置创建人
         luck.producer = msg.sender;
         uint256 ethAmount = msg.value;
-        require(ethAmount == luck.ethAmount, "ethAmount engough");
+        require(ethAmount > 0, "ethAmount engough");
+        luck.ethAmount = ethAmount;
+        
         luck.startBlock = block.number;
         luck.endBlock = luck.startBlock + duration;
         luck.participation_cost = participationCost_;
@@ -133,7 +149,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         console.log("currentId1 is:", currentId);
         producerLucks[msg.sender].push(currentId);
         lucksMap[luck.id] = luck;
-        currentId += 1;
+        
     }
 
     function addRunningLucks(Lucky memory luck) internal {
@@ -205,9 +221,75 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         require(attendQuantity > 0, "not attend amount");
         // start pickwinner;
         uint randomNumber = randomNumber(luckId);
-        winnerId = (randomNumber % attendQuantity)+1;
+        winnerId = (randomNumber % luckFenney.quantity)+1;
+        luckFenney.winnerId = winnerId;
         winnerAddress = luckAttenduser[luckId][winnerId];
-       
+        if(winnerAddress == address(0)){
+            winnerAddress = luckFenney.producer;
+        }
+        luckFenney.winnerAddress = winnerAddress;
+
+        TransferHelper.safeTransferETH(
+            winnerAddress,
+            luckFenney.ethAmount
+        );
+
+        //delivery the erc20,erc721,erc1155 reward tokens
+        deliveryTokenReward(winnerAddress,currentId);
+
+
+        uint receiveEth = luckFenney.currentQuantity*luckFenney.participation_cost;
+        uint leftAmount = handleFee(receiveEth);
+        TransferHelper.safeTransferETH(
+            luckFenney.producer,
+            leftAmount
+        );
+    }
+
+    function deliveryTokenReward(address winnner,uint currentId)private {
+        Reward[] memory rewards = getLuckyRewards(currentId);
+        for(uint i = 0; i < rewards.length; i++) {
+            Reward memory reward = rewards[i];
+            if (reward.rewardType == RewardType.ERC20) {
+                IERC20(reward.token).transfer(
+                    winnner,
+                    reward.amount
+                );
+            } else if (reward.rewardType == RewardType.ERC721) {
+                // address from, address to,uint256 tokenId,bytes calldata data
+                IERC721(reward.token).safeTransferFrom(
+                    address(this),
+                    winnner,
+                    reward.tokenId,
+                    new bytes(0)
+                );
+            } else if (reward.rewardType == RewardType.ERC1155) {
+                // address from,address to,uint256 id,uint256 amount,bytes calldata data
+                IERC1155(reward.token).safeTransferFrom(
+                    address(this),
+                    winnner,
+                    reward.tokenId,
+                    reward.amount,
+                    new bytes(0)
+                );
+            }
+        }
+    }
+
+    function handleFee(uint amount) private returns(uint leftAmount){
+        uint fee = amount * feeRatio /base;
+        uint leftAmount = amount - fee;
+        uint feePledge = leftAmount * feePledgeRatio /base;
+        uint feePlatform = fee - feePledge;
+        TransferHelper.safeTransferETH(
+            pledgeAddress,
+            feePledge
+        );
+        TransferHelper.safeTransferETH(
+            platformAddress,
+            feePlatform
+        );
+
     }
 
     function onERC721Received(
