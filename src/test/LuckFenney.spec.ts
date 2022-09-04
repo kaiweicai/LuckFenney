@@ -224,77 +224,87 @@ describe("luckFenney test", async function () {
     
             //add erc20 reward
             let MyToken = await ethers.getContractFactory("MyERC20");
-            let myErc20Token = await MyToken.deploy();
-            await myErc20Token.initialize("myToken","myToken");
-            await myErc20Token.mint(owner.address,expandTo18Decimals(1000));
+            let myErc20RewardToken = await MyToken.deploy();
+            await myErc20RewardToken.initialize("myToken","myToken");
+            await myErc20RewardToken.mint(owner.address,expandTo18Decimals(1000));
             let token20Amount = 1000;
-            await myErc20Token.approve(luckFenney.address,token20Amount);
-            let token20Reward = {token:myErc20Token.address,rewardType:0,amount:token20Amount,tokenId:0};
+            await myErc20RewardToken.approve(luckFenney.address,token20Amount);
+            let token20Reward = {token:myErc20RewardToken.address,rewardType:0,amount:token20Amount,tokenId:0};
             let currentBlock = await time.latestBlock();
             let duration = 100;
             let participation = 400;
             let initializeQuantity = 100;
             let ethAmount = 200;
             await luckFenney.createLuck(initializeQuantity,[token20Reward,token1155Reward,token721Reward],duration,participation,{value:ethAmount});
+
             let currentId = (await luckFenney.currentId());
             let luckyAfterCreate = await luckFenney.lucksMap(currentId);
-            let quantityCreate = luckyAfterCreate.quantity;
-            expect(quantityCreate).to.be.equals(initializeQuantity);
-            var balanceOfLucky = await ethers.provider.getBalance(luckFenney.address);
-            expect(balanceOfLucky).to.be.equals(ethAmount);
+            console.log("luckyAfterCreate is:",luckyAfterCreate);
+            expect(luckyAfterCreate.producer).to.be.equals(owner.address);
+            expect(luckyAfterCreate.quantity).to.be.equals(initializeQuantity);
             let luckyIds = await luckFenney.getProducerLucks(owner.address);
             expect(luckyIds[0]).to.be.equals(1);
-
-            luckFenney.luckyRewards
-            
+            expect(luckyAfterCreate.state).to.be.equals(1);
             expect(currentId).to.be.equals(1);
             let lucky = await luckFenney.lucksMap(currentId);
             expect(currentBlock+1).to.be.equals(lucky.startBlock);
             let endBlock = lucky.endBlock;
             expect(endBlock).to.be.equals(currentBlock+1+duration);
-            expect(lucky.producer).to.be.equals(owner.address);
+            var balanceOfLucky = await ethers.provider.getBalance(luckFenney.address);
+            expect(balanceOfLucky).to.be.equals(ethAmount);
+            expect(participation).to.be.equals(lucky.participation_cost);
+            expect(0).to.be.equals(lucky.currentQuantity);
+            //end test lottery object
+            let luckyState = lucky.state;
+            expect(luckyState).to.be.equals(1);
+            
             let luckyBalanceOf1155Reward = await my1155Token.balanceOf(luckFenney.address,erc1155TokenId);
             expect(luckyBalanceOf1155Reward).to.be.equals(amountOf1155);
             let luckyBalanceOf721Reward = await my721Token.balanceOf(luckFenney.address);
             expect(luckyBalanceOf721Reward).to.be.equals(1);
-            let luckyBalance20OfReward = await myErc20Token.balanceOf(luckFenney.address);
+            let luckyBalance20OfReward = await myErc20RewardToken.balanceOf(luckFenney.address);
             expect(luckyBalance20OfReward).to.be.equals(token20Amount);
             let rewards = await luckFenney.getLuckyRewards(currentId);
-            let luckyState = lucky.state;
-            expect(luckyState).to.be.equals(1);
+            console.log("rewards is:",rewards);
             
 
             //用户参与抽奖
-            // await expect(luckFenney.connect(user).enter(0,{from:user.address})).to.be.revertedWith("not open");
-            // await expect(luckFenney.connect(user).enter(currentId,{from:user.address})).to.be.revertedWith("value error");
-            // await expect(luckFenney.connect(user).enter(currentId,{from:user.address,value:10})).to.be.revertedWith("value error");
-            // let attendAmount = 3000;
-            // await luckFenney.connect(user).enter(0,{from:user.address,value:attendAmount});
-            // let luckyAfterEnter = await luckFenney.lucksMap(currentId);
-            // var balanceOfLucky = await ethers.provider.getBalance(luckFenney.address);
-            // console.log("balanceOfLucky is:",balanceOfLucky);
-            // expect(balanceOfLucky).to.be.equals(ethAmount + attendAmount - attendAmount%participation);
-            // console.log("lucky.currentQuantity is:",luckyAfterEnter.currentQuantity);
-            // let attend = BigNumber.from(attendAmount).div(participation);
-            // console.log("attend is:",attend);
-            // expect(luckyAfterEnter.currentQuantity).to.be.equals(attend);
-            // let quantity = luckyAfterEnter.quantity;
-            
-            // let attendUserAddress = await luckFenney.luckAttenduser(currentId ,luckyAfterEnter.currentQuantity);
-            // expect(attendUserAddress).to.be.equals(user.address);
+            await expect(luckFenney.connect(user).enter(0,{from:user.address})).to.be.revertedWith("not open");
+            await expect(luckFenney.connect(user).enter(currentId,{from:user.address})).to.be.revertedWith("value error");
+            await expect(luckFenney.connect(user).enter(currentId,{from:user.address,value:10})).to.be.revertedWith("value error");
+            let balanceOfUser = await ethers.provider.getBalance(user.address);
+            let attendAmount = 3000;
+            await luckFenney.connect(user).enter(1,{from:user.address,value:attendAmount});
+            let balanceOfUserAfterEnter = await ethers.provider.getBalance(user.address);
+            // expect(balanceOfUserAfterEnter).to.be.equals(balanceOfUser.sub(attendAmount).add(attendAmount%participation));
+            let luckyAfterEnter = await luckFenney.lucksMap(currentId);
+            var balanceOfLucky = await ethers.provider.getBalance(luckFenney.address);
+            console.log("balanceOfLucky is:",balanceOfLucky);
+            expect(balanceOfLucky).to.be.equals(ethAmount + attendAmount - attendAmount%participation);
+            console.log("lucky.currentQuantity is:",luckyAfterEnter.currentQuantity);
+            let attend = BigNumber.from(attendAmount).div(participation);
+            console.log("attend is:",attend);
+            expect(luckyAfterEnter.currentQuantity).to.be.equals(attend);
+            let quantity = luckyAfterEnter.quantity;
 
+            let attendUserAddress = await luckFenney.luckAttenduser(currentId ,luckyAfterEnter.currentQuantity);
+            expect(attendUserAddress).to.be.equals(user.address);
+            let userAttendsLuck = await luckFenney.getUserAttendsLuck(user.address,currentId);
+            console.log("userAttends is:",userAttendsLuck);
+            expect(userAttendsLuck.length).to.be.equals(attend);
+            expect(userAttendsLuck[userAttendsLuck.length-1]).to.be.equals(attend);
             // //再给用户购买100个超出总彩票异常
-            // await expect(luckFenney.connect(user).enter(0,{from:user.address,value:attendAmount*100})).to.be.revertedWith("too attends");
+            await expect(luckFenney.connect(user).enter(1,{from:user.address,value:attendAmount*100})).to.be.revertedWith("too attends");
 
-            // await time.advanceBlockTo(200);
-            // await expect(luckFenney.connect(user).enter(0,{from:user.address,value:10})).to.be.revertedWith("over endBlock");
-            // let userBalanceOfPlatform = await platformToken.balanceOf(user.address);
-            // let ownerBalanceOfPlatform = await platformToken.balanceOf(owner.address);
+            await time.advanceBlockTo(200);
+            await expect(luckFenney.connect(user).enter(1,{from:user.address,value:10})).to.be.revertedWith("over endBlock");
+            let userBalanceOfPlatform = await platformToken.balanceOf(user.address);
+            let ownerBalanceOfPlatform = await platformToken.balanceOf(owner.address);
             
-            // let userRewardAmount = attend.mul(expandTo18Decimals(5));
-            // let ownerRewardAmount = attend.mul(expandTo18Decimals(1));
-            // expect(userRewardAmount).to.be.equals(userBalanceOfPlatform);
-            // expect(ownerRewardAmount).to.be.equals(ownerBalanceOfPlatform);
+            let userRewardAmount = attend.mul(expandTo18Decimals(5));
+            let ownerRewardAmount = attend.mul(expandTo18Decimals(1));
+            expect(userRewardAmount).to.be.equals(userBalanceOfPlatform);
+            expect(ownerRewardAmount).to.be.equals(ownerBalanceOfPlatform);
         });
 
     });
