@@ -6,5 +6,5 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // 收集5%手续费的20%作为平台费用。
 contract PlatformContract{
-    
+    receive() external payable {}
 }
