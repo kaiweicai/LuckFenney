@@ -10,15 +10,19 @@ import "./libraries/TransferHelper.sol";
 import "./libraries/RandomNumber.sol";
 import "hardhat/console.sol";
 
-
-contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNumber {
+contract LuckFenney is
+    ERC721Holder,
+    ERC1155Holder,
+    OwnableUpgradeable,
+    RandomNumber
+{
     // using TransferHelper for address;
     uint256 constant QuantityMin = 100;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
-    uint public feeRatio;
-    uint public feePledgeRatio;
-    uint public constant base = 10000;
+    uint256 public feeRatio;
+    uint256 public feePledgeRatio;
+    uint256 public constant base = 10000;
     address public pledgeAddress;
     address public platformAddress;
     mapping(address => uint256[]) public producerLucks;
@@ -26,13 +30,12 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
     mapping(uint256 => Reward[]) public luckyRewards;
     uint256[] public runningLucks;
     IERC20 public paltformToken;
-    uint public attendRewardAmount; // 用户参与奖励平台token的数量。
-    uint public holderRewardAmount; // 用户参与奖励平台token的数量。
+    uint256 public attendRewardAmount; // 用户参与奖励平台token的数量。
+    uint256 public holderRewardAmount; // 用户参与奖励平台token的数量。
     mapping(uint256 => mapping(uint256 => address)) public luckAttenduser; // 用户参与的 luckId=>attendId=>address
     mapping(address => mapping(uint256 => uint256[])) public userAttendsLuck; // 用户参与的 address=>luckId=>attendId
     mapping(address => bool) public isManager;
     event SetManager(address manager, bool flag);
-
 
     modifier onlyManager() {
         require(isManager[_msgSender()], "Not manager");
@@ -76,8 +79,13 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
 
     event LuckCreated(uint256 LuckID, address creator);
 
-
-    function initialize(IERC20 paltformToken_,uint userReward_,uint holderReward_,address pledgeAddress_,address platformAddress_) public initializer {
+    function initialize(
+        IERC20 paltformToken_,
+        uint256 userReward_,
+        uint256 holderReward_,
+        address pledgeAddress_,
+        address platformAddress_
+    ) public initializer {
         __Ownable_init();
         paltformToken = paltformToken_;
         isManager[_msgSender()] = true;
@@ -107,7 +115,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         uint256 ethAmount = msg.value;
         require(ethAmount > 0, "ethAmount engough");
         luck.ethAmount = ethAmount;
-        
+
         luck.startBlock = block.number;
         luck.endBlock = luck.startBlock + duration;
         luck.participation_cost = participationCost_;
@@ -149,7 +157,6 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         console.log("currentId1 is:", currentId);
         producerLucks[msg.sender].push(currentId);
         lucksMap[luck.id] = luck;
-        
     }
 
     function addRunningLucks(Lucky memory luck) internal {
@@ -178,27 +185,37 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
         );
         console.log("-------------2");
         for (uint256 i = 0; i < attendAmount; i++) {
-            luckFenney.currentQuantity +=1;
+            luckFenney.currentQuantity += 1;
             address useAddress = msg.sender;
             luckAttenduser[luckId][luckFenney.currentQuantity] = msg.sender;
-            userAttendsLuck[useAddress][luckId].push(luckFenney.currentQuantity);
+            userAttendsLuck[useAddress][luckId].push(
+                luckFenney.currentQuantity
+            );
         }
-        console.log("-------------3 attendAmount,holderRewardAmount is:",attendAmount,holderRewardAmount);
+        console.log(
+            "-------------3 attendAmount,holderRewardAmount is:",
+            attendAmount,
+            holderRewardAmount
+        );
         // 奖励用户平台token
-        paltformToken.mint(msg.sender,attendAmount*attendRewardAmount);
+        paltformToken.mint(msg.sender, attendAmount * attendRewardAmount);
         //发起者发放代币
-        paltformToken.mint(luckFenney.producer,attendAmount*holderRewardAmount);
-        
+        paltformToken.mint(
+            luckFenney.producer,
+            attendAmount * holderRewardAmount
+        );
+
         // 退还用户的多余的资金。
         uint256 leftEth = value % luckFenney.participation_cost;
         console.log("lefEth is: ", leftEth);
-        TransferHelper.safeTransferETH(
-            msg.sender,
-            leftEth
-        );
+        TransferHelper.safeTransferETH(msg.sender, leftEth);
     }
 
-    function getUserAttendsLuck(address user,uint luckId)public view returns (uint[] memory){
+    function getUserAttendsLuck(address user, uint256 luckId)
+        public
+        view
+        returns (uint256[] memory)
+    {
         return userAttendsLuck[user][luckId];
     }
 
@@ -207,53 +224,58 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
     //     uint blockTime = block.timestamp;
     //     return uint(keccak256(abi.encodePacked(blockTime)));
     // }
-    
+
     // pick_winner
-    function pickWinner(uint256 luckId) public returns(uint winnerId,address winnerAddress){
+    function pickWinner(uint256 luckId)
+        public
+        returns (uint256 winnerId, address winnerAddress)
+    {
         //not check the msg sender is holder ,let any one can end the this game.
         Lucky storage luckFenney = lucksMap[luckId];
         require(luckFenney.state == LuckyState.OPEN, "close but not open");
         luckFenney.state = LuckyState.CLOSED;
-        require(luckFenney.endBlock <= block.number,"not end");
+        require(luckFenney.endBlock <= block.number, "not end");
         //check currentQuantity >0
-        uint attendQuantity = luckFenney.currentQuantity;
+        uint256 attendQuantity = luckFenney.currentQuantity;
         require(attendQuantity > 0, "not attend amount");
         // start pickwinner;
-        uint randomNumber = randomNumber(luckId);
-        winnerId = (randomNumber % luckFenney.quantity)+1;
+        uint256 randomNumber = randomNumber(luckId);
+        winnerId = (randomNumber % luckFenney.quantity) + 1;
         luckFenney.winnerId = winnerId;
         winnerAddress = luckAttenduser[luckId][winnerId];
-        if(winnerAddress == address(0)){
+        if (winnerAddress == address(0)) {
             winnerAddress = luckFenney.producer;
         }
         luckFenney.winnerAddress = winnerAddress;
 
-        TransferHelper.safeTransferETH(
-            winnerAddress,
-            luckFenney.ethAmount
-        );
+        TransferHelper.safeTransferETH(winnerAddress, luckFenney.ethAmount);
 
         //delivery the erc20,erc721,erc1155 reward tokens
-        deliveryTokenReward(winnerAddress,luckId);
+        deliveryTokenReward(winnerAddress, luckId);
+        console.log("++++++++++7");
 
-
-        uint receiveEth = luckFenney.currentQuantity*luckFenney.participation_cost;
-        uint leftAmount = handleFee(receiveEth);
-        TransferHelper.safeTransferETH(
-            luckFenney.producer,
+        uint256 receiveEth = luckFenney.currentQuantity *
+            luckFenney.participation_cost;
+        uint256 leftAmount = handleFee(receiveEth);
+        console.log(
+            "++++++++++8 receiveEth,leftAmount is:",
+            receiveEth,
             leftAmount
         );
+        TransferHelper.safeTransferETH(luckFenney.producer, leftAmount);
+        console.log("++++++++++9");
     }
 
-    function deliveryTokenReward(address winnner,uint luckId)private {
+    function deliveryTokenReward(address winnner, uint256 luckId) private {
         Reward[] memory rewards = getLuckyRewards(luckId);
-        for(uint i = 0; i < rewards.length; i++) {
+        console.log("++++++++++1");
+        for (uint256 i = 0; i < rewards.length; i++) {
             Reward memory reward = rewards[i];
+            console.log("++++++++++2");
             if (reward.rewardType == RewardType.ERC20) {
-                IERC20(reward.token).transfer(
-                    winnner,
-                    reward.amount
-                );
+                console.log("++++++++++3");
+                IERC20(reward.token).transfer(winnner, reward.amount);
+                console.log("++++++++++4");
             } else if (reward.rewardType == RewardType.ERC721) {
                 // address from, address to,uint256 tokenId,bytes calldata data
                 IERC721(reward.token).safeTransferFrom(
@@ -262,6 +284,7 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
                     reward.tokenId,
                     new bytes(0)
                 );
+                console.log("++++++++++5");
             } else if (reward.rewardType == RewardType.ERC1155) {
                 // address from,address to,uint256 id,uint256 amount,bytes calldata data
                 IERC1155(reward.token).safeTransferFrom(
@@ -271,24 +294,22 @@ contract LuckFenney is ERC721Holder, ERC1155Holder, OwnableUpgradeable,RandomNum
                     reward.amount,
                     new bytes(0)
                 );
+                console.log("++++++++++6");
             }
         }
     }
 
-    function handleFee(uint amount) private returns(uint leftAmount){
-        uint fee = amount * feeRatio /base;
+    function handleFee(uint256 amount) private returns (uint256 leftAmount) {
+        uint256 fee = (amount * feeRatio) / base;
         leftAmount = amount - fee;
-        uint feePledge = leftAmount * feePledgeRatio /base;
-        uint feePlatform = fee - feePledge;
-        TransferHelper.safeTransferETH(
-            pledgeAddress,
-            feePledge
-        );
-        TransferHelper.safeTransferETH(
-            platformAddress,
-            feePlatform
-        );
-
+        
+        uint256 feePledge = (fee * feePledgeRatio) / base;
+        uint256 feePlatform = fee - feePledge;
+        console.log("feePledge,feePlatform,pledgeAddress is-------:",feePledge,feePlatform,pledgeAddress);
+        uint ethBalance = address(this).balance;
+        console.log("ethBalance is-------:",ethBalance);
+        TransferHelper.safeTransferETH(pledgeAddress, feePledge);
+        TransferHelper.safeTransferETH(platformAddress, feePlatform);
     }
 
     function onERC721Received(
