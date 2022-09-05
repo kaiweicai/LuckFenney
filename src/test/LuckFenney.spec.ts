@@ -236,7 +236,7 @@ describe("luckFenney test", async function () {
             let initializeQuantity = 100;
             let ethAmount = 200;
             await luckFenney.createLuck(initializeQuantity,[token20Reward,token1155Reward,token721Reward],duration,participation,{value:ethAmount});
-
+            
             let currentId = (await luckFenney.currentId());
             let luckyAfterCreate = await luckFenney.lucksMap(currentId);
             console.log("luckyAfterCreate is:",luckyAfterCreate);
@@ -295,7 +295,7 @@ describe("luckFenney test", async function () {
             expect(userAttendsLuck[userAttendsLuck.length-1]).to.be.equals(attend);
             // //再给用户购买100个超出总彩票异常
             await expect(luckFenney.connect(user).enter(1,{from:user.address,value:attendAmount*100})).to.be.revertedWith("too attends");
-
+            await expect(luckFenney.connect(user).pickWinner(currentId,{from:user.address})).to.be.revertedWith("not end");
             await time.advanceBlockTo(200);
             await expect(luckFenney.connect(user).enter(1,{from:user.address,value:10})).to.be.revertedWith("over endBlock");
             let userBalanceOfPlatform = await platformToken.balanceOf(user.address);
@@ -305,6 +305,36 @@ describe("luckFenney test", async function () {
             let ownerRewardAmount = attend.mul(expandTo18Decimals(1));
             expect(userRewardAmount).to.be.equals(userBalanceOfPlatform);
             expect(ownerRewardAmount).to.be.equals(ownerBalanceOfPlatform);
+
+
+            let balanceOfUserAfterBeforePick = await ethers.provider.getBalance(user.address);
+            let balanceOfOwnerAfterBeforePick = await ethers.provider.getBalance(owner.address);
+
+            await expect(luckFenney.connect(user).pickWinner(0,{from:user.address})).to.be.revertedWith("close but not open");
+            await luckFenney.connect(user).pickWinner(currentId,{from:user.address});
+            let luckAfterPick = await luckFenney.lucksMap(currentId);
+            let winnerId = luckAfterPick.winnerId;
+            let winnerAddress = luckAfterPick.winnerAddress;
+            console.log("winnerId,winnerAddress is:",winnerId,winnerAddress);
+            let balanceOfUserAfterAfterPick = await ethers.provider.getBalance(user.address);
+            let balanceOfOwnerAfterAfterPick = await ethers.provider.getBalance(owner.address);
+            let getRewardEth = user.address === winnerAddress ?balanceOfUserAfterAfterPick.sub(balanceOfUserAfterBeforePick)
+                :balanceOfOwnerAfterAfterPick.sub(balanceOfOwnerAfterBeforePick);
+            expect(getRewardEth).to.be.equals(ethAmount);
+
+
+            // start test the next Luck
+            await luckFenney.createLuck(initializeQuantity,[],duration,participation,{value:ethAmount});
+            let nextCurrentId = await luckFenney.currentId();
+            console.log("nextCurrentId is:",nextCurrentId);
+            let nextLuck = await luckFenney.lucksMap(nextCurrentId);
+            let nextEndBlock = nextLuck.endBlock;
+            console.log("nextEndBlock is:",nextEndBlock);
+            await expect(luckFenney.connect(user).pickWinner(nextCurrentId,{from:user.address})).to.be.revertedWith("not end");
+            let blockNumber = await time.latestBlock();
+            console.log("test blockNumber is:",blockNumber);
+            await time.advanceBlockTo(400);
+            await expect(luckFenney.connect(user).pickWinner(nextCurrentId,{from:user.address})).to.be.revertedWith("not attend amount");
         });
 
     });
