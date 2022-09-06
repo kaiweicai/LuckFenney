@@ -13,6 +13,7 @@ import {
     MINIMUM_LIQUIDITY,
     setNextBlockTime,
   } from "./shared/utilities";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 
 
@@ -318,21 +319,42 @@ describe("luckFenney test", async function () {
             console.log("winnerId,winnerAddress is:",winnerId,winnerAddress);
             let balanceOfUserAfterAfterPick = await ethers.provider.getBalance(user.address);
             let balanceOfOwnerAfterAfterPick = await ethers.provider.getBalance(owner.address);
+
+            let feeRatio = await luckFenney.feeRatio();
+            let base = await luckFenney.base();
+            let leftRatio = base.sub(feeRatio).toNumber();
+            console.log("leftRatio is:",leftRatio);
             let getRewardEth;
             if(user.address === winnerAddress){
                 console.log("user.address is:",user.address);
                 getRewardEth = balanceOfUserAfterAfterPick.sub(balanceOfUserAfterBeforePick);
                 expect(getRewardEth).to.be.equals(ethAmount);
+                expect(await myErc20RewardToken.balanceOf(winnerAddress)).to.be.equals(token20Amount);
             } else{
+                console.log("owner.address is:",user.address);
                 getRewardEth = balanceOfOwnerAfterAfterPick.sub(balanceOfOwnerAfterBeforePick);
-                let reward = (attendAmount-attendAmount%participation)*95/100+ethAmount;
+                let reward = (attendAmount-attendAmount%participation)*leftRatio/base.toNumber()+ethAmount;
                 expect(getRewardEth).to.be.equals(reward);
+                expect(await myErc20RewardToken.balanceOf(winnerAddress)).to.be.equals(expandTo18Decimals(1000));
             }
 
             // TODO: Distribution of test fees and distribution of staking rewards。
+            let receiveEth = luckAfterPick.currentQuantity.mul(luckAfterPick.participation_cost);
+            let feeAmount = feeRatio.mul(receiveEth).div(base);
+            let leftAmount = receiveEth.sub(feeAmount);
+            console.log("test leftAmount is:",leftAmount);
+            let feePledgeRatio = await luckFenney.feePledgeRatio();
+            let pledgeAddress = await luckFenney.pledgeAddress();
+            let platformAddress = await luckFenney.platformAddress();
+            let pledgeAmount = feeAmount.mul(feePledgeRatio).div(base);
+            let platfromAmount = feeAmount.sub(pledgeAmount);
+            let balanceOfPledge = await ethers.provider.getBalance(pledgeAddress);
+            let balanceOfPlatform = await ethers.provider.getBalance(platformAddress);
+            expect(pledgeAmount).to.be.equals(balanceOfPledge);
+            expect(platfromAmount).to.be.equals(balanceOfPlatform);
             // TODO: Test distribution of erc20, erc721, erc1155 rewards。
-            
-
+            expect(await my721Token.balanceOf(winnerAddress)).to.be.equals(1);
+            expect(await my1155Token.balanceOf(winnerAddress,0)).to.be.equals(amountOf1155);
 
             // start test the next Luck
             await luckFenney.createLuck(initializeQuantity,[],duration,participation,{value:ethAmount});

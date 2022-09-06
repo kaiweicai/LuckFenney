@@ -126,6 +126,7 @@ contract LuckFenney is
             luckyRewards[currentId].push(rewards[i]);
             Reward memory reward = rewards[i];
             if (reward.rewardType == RewardType.ERC20) {
+                console.log("reward.amount is:",reward.amount);
                 IERC20(reward.token).transferFrom(
                     msg.sender,
                     address(this),
@@ -303,7 +304,7 @@ contract LuckFenney is
     function handleFee(uint256 amount) private returns (uint256 leftAmount) {
         uint256 fee = (amount * feeRatio) / base;
         leftAmount = amount - fee;
-        
+        console.log("leftAmount is-------:",leftAmount);
         uint256 feePledge = (fee * feePledgeRatio) / base;
         uint256 feePlatform = fee - feePledge;
         console.log("feePledge,feePlatform,pledgeAddress is-------:",feePledge,feePlatform,pledgeAddress);
