@@ -57,7 +57,7 @@ describe("luckFenney test", async function () {
         let { owner,luckFenney } = await loadFixture(v2Fixture);
         let participation = 400;
         let ethAmount = 200;
-        await expect(luckFenney.createLuck(10,[],10,participation)).to.be.revertedWith("LQBTMBLM");
+        await expect(luckFenney.createLuck(5,[],10,participation)).to.be.revertedWith("LQBTMBLM");
         await expect(luckFenney.createLuck(100,[],0,participation)).to.be.revertedWith("duration lt 0");
         await luckFenney.createLuck(100,[],100,participation,{value:ethAmount});
         let luckyIds = await luckFenney.getProducerLucks(owner.address);
@@ -233,7 +233,7 @@ describe("luckFenney test", async function () {
             let currentBlock = await time.latestBlock();
             let duration = 100;
             let participation = 400;
-            let initializeQuantity = 100;
+            let initializeQuantity = 14;
             let ethAmount = 200;
             await luckFenney.createLuck(initializeQuantity,[token20Reward,token1155Reward,token721Reward],duration,participation,{value:ethAmount});
             
@@ -310,17 +310,28 @@ describe("luckFenney test", async function () {
             let balanceOfUserAfterBeforePick = await ethers.provider.getBalance(user.address);
             let balanceOfOwnerAfterBeforePick = await ethers.provider.getBalance(owner.address);
 
-            await expect(luckFenney.connect(user).pickWinner(0,{from:user.address})).to.be.revertedWith("close but not open");
-            await luckFenney.connect(user).pickWinner(currentId,{from:user.address});
+            await expect(luckFenney.connect(alice).pickWinner(0,{from:alice.address})).to.be.revertedWith("close but not open");
+            await luckFenney.connect(alice).pickWinner(currentId,{from:alice.address});
             let luckAfterPick = await luckFenney.lucksMap(currentId);
             let winnerId = luckAfterPick.winnerId;
             let winnerAddress = luckAfterPick.winnerAddress;
             console.log("winnerId,winnerAddress is:",winnerId,winnerAddress);
             let balanceOfUserAfterAfterPick = await ethers.provider.getBalance(user.address);
             let balanceOfOwnerAfterAfterPick = await ethers.provider.getBalance(owner.address);
-            let getRewardEth = user.address === winnerAddress ?balanceOfUserAfterAfterPick.sub(balanceOfUserAfterBeforePick)
-                :balanceOfOwnerAfterAfterPick.sub(balanceOfOwnerAfterBeforePick);
-            expect(getRewardEth).to.be.equals(ethAmount);
+            let getRewardEth;
+            if(user.address === winnerAddress){
+                console.log("user.address is:",user.address);
+                getRewardEth = balanceOfUserAfterAfterPick.sub(balanceOfUserAfterBeforePick);
+                expect(getRewardEth).to.be.equals(ethAmount);
+            } else{
+                getRewardEth = balanceOfOwnerAfterAfterPick.sub(balanceOfOwnerAfterBeforePick);
+                let reward = (attendAmount-attendAmount%participation)*95/100+ethAmount;
+                expect(getRewardEth).to.be.equals(reward);
+            }
+
+            // TODO: Distribution of test fees and distribution of staking rewards。
+            // TODO: Test distribution of erc20, erc721, erc1155 rewards。
+            
 
 
             // start test the next Luck

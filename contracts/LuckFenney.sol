@@ -17,7 +17,7 @@ contract LuckFenney is
     RandomNumber
 {
     // using TransferHelper for address;
-    uint256 constant QuantityMin = 100;
+    uint256 constant QuantityMin = 10;
     uint256 constant QuantityMax = 10000;
     uint256 public currentId = 0;
     uint256 public feeRatio;
@@ -248,6 +248,7 @@ contract LuckFenney is
         }
         luckFenney.winnerAddress = winnerAddress;
 
+        console.log("luckFenney.ethAmount is:",luckFenney.ethAmount);
         TransferHelper.safeTransferETH(winnerAddress, luckFenney.ethAmount);
 
         //delivery the erc20,erc721,erc1155 reward tokens
